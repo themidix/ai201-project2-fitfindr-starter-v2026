@@ -78,8 +78,8 @@ def search_listings(
     optional size and an optional price ceiling. `description` is plain
     keywords such as "vintage graphic tee". `size` is a size label such as
     "M", "XL" or "US 9" and matches whole words only, so "M" matches "S/M" and
-    "M/L" but not "XL"; omit it to skip size filtering. `max_price` is in whole
-    US dollars, inclusive; omit it for no ceiling. Returns a list of at most
+    "M/L" but not "XL"; omit it to skip size filtering. `max_price` is in
+    US dollars (decimals allowed), inclusive; omit it for no ceiling. Returns a list of at most
     10 listing objects (id, title, description, category, style_tags, size,
     condition, price, colors, brand, platform), best keyword match first.
     Returns an empty list, never null and never an error, when nothing matches.
