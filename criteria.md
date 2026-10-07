@@ -25,9 +25,11 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+Search is a plain keyword match, and the query parser is regex, so an
+unusual phrasing ("something cute for brunch") can score zero on every
+listing. Two of the three tools also call a model that can time out or be
+rate limited. 4 of 5 allows for one such miss; 5 of 5 would be a promise
+about a model I don't control.
 
 ---
 
@@ -37,65 +39,60 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+This path never touches the model. It depends only on `search_listings`
+returning `[]` and one `if` in `run_agent`, both deterministic code, so
+there is nothing that could vary between tries. Anything under 5 of 5 would
+mean a bug, not bad luck.
 
 ---
 
 ## 3. Something about state
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
+For a matching query, `session["selected_item"]["id"]` equals the `id` of
+the item passed to `suggest_outfit` and to `create_fit_card`, and equals
+`session["search_results"][0]["id"]`, in 5 of 5 tries. Checked by wrapping
+both tools and comparing the ids they received.
 
 **Why this target:**
-
+The item is chosen once and then handed on by way of the session. A state
+bug (a stale variable, a different result picked the second time) would look
+like the outfit being about the wrong garment, which reads as a model
+problem. The ids are exact and the comparison involves no model output, so
+5 of 5 is the only fair target.
 
 
 ---
 
 ## 4. Something about the fit card
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+For a matching query, the fit card is 2 to 4 sentences, contains the
+item's price (e.g. "$28") and its platform name, and does not open with the
+same first sentence as the card for a different item, in at least 4 of 5
+tries.
 
 **Why this target:**
-
+Those are the things I'd be unhappy to see in a post: a card that omits the
+price, rambles past four sentences, or is a template that opens the same way
+for every item. Each is a string check I can count. It's 4 of 5 rather than
+5 of 5 because the model sometimes writes a fifth sentence or spells the
+platform differently ("Thred Up"), and the prompt can only ask, not force.
 
 
 ---
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+When a query includes a price ceiling (e.g. "under $30"), every listing in
+`session["search_results"]` has `price` less than or equal to that ceiling,
+in 5 of 5 tries across 5 different ceilings, and the filter treats the
+ceiling as inclusive (a $30 item survives "under $30").
 
 **Why this target:**
-
+A price ceiling is the one constraint a shopper states as a hard number, and
+returning a $45 jacket for "under $30" makes the whole agent look broken.
+Filtering is plain code on a float field, so there is no reason to accept a
+miss. The ceiling comes from my regex, so the real risk is parsing ("$30" vs
+"30 dollars"), which is why the test uses several phrasings.
 
 
 ---
