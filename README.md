@@ -87,57 +87,66 @@ instead of making up an outfit for an item that doesn't exist.
 
 ## Sample Run
 
-<!-- Two things go here.
-
-     1. One FULL query and its output, pasted as text.
-     2. Your three per-tool terminal tests — the command and what it printed. -->
-
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
 
+  Found:    Vintage Band Tee — Faded Grey — $19.0 on depop
+
+  Outfit:   Outfit One: Pair the vintage band tee with the baggy straight-leg jeans, dark wash, and the brown leather belt. Layer the vintage black denim jacket on top and finish with the chunky white sneakers for a casual grunge street look. 
+
+Outfit Two: Tuck the vintage band tee into the wide-leg khaki trousers, secured with the brown leather belt. Add the black combat boots and complete the outfit with the black crossbody bag for an effortless, vintage-inspired everyday vibe.
+
+  Fit card: Finally letting go of this perfectly faded grey vintage band tee for $19 on depop, and honestly it has the ultimate grunge street vibe. Style it casually with baggy denim and chunky sneakers, or dress it up with khaki trousers and combat boots for an effortless everyday look 🎸🖤
+
+0 model calls this session, 2 served from cache
+```
+
+**A query that matches nothing (the branch)**
+
+```
+$ python app.py ask 'designer ballgown size XXS under $5'
+
+  No listings matched 'designer ballgown'. Try to drop or change the size (XXS), raise the price ceiling ($5), or try broader keywords like 'tee', 'jeans' or 'jacket'.
+
+0 model calls this session
 ```
 
 **The three tools, tested one at a time**
 
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
-
+[{'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', 'description': 'Vintage-style bootleg tee with faded graphic. Slightly boxy fit. 100% cotton, soft and worn-in.', 'category': 'tops', 'style_tags': ['graphic tee', 'vintage', 'grunge', 'streetwear', 'band tee'], 'size': 'L', 'condition': 'good', 'price': 24.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', 'description': 'Super cute early 2000s baby tee with butterfly graphic. Fitted crop length. Tag says medium but fits like a small.', 'category': 'tops', 'style_tags': ['y2k', 'vintage', 'graphic tee', 'cottagecore'], 'size': 'S/M', 'condition': 'excellent', 'price': 18.0, 'colors': ['white', 'pink', 'purple'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_033', 'title': 'Vintage Band Tee — Faded Grey', 'description': 'Faded grey band-style tee with distressed graphic. Crew neck. Fits boxy. Well-loved but no holes or major damage.', 'category': 'tops', 'style_tags': ['vintage', 'grunge', 'band tee', 'graphic tee', 'streetwear'], 'size': 'L', 'condition': 'fair', 'price': 19.0, 'colors': ['grey', 'charcoal'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_017', 'title': 'Mesh Long-Sleeve Top — Black', 'description': 'Sheer black mesh long-sleeve. Great for layering under a graphic tee or over a bralette. Stretchy material, fits true to size.', 'category': 'tops', 'style_tags': ['y2k', 'grunge', 'goth', 'layering'], 'size': 'S/M', 'condition': 'excellent', 'price': 15.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_015', 'title': 'Vintage Graphic Hoodie — Faded Black', 'description': 'Faded black pullover hoodie with barely-visible vintage graphic on the chest. Cozy interior. Some pilling but adds to the worn-in look.', 'category': 'tops', 'style_tags': ['vintage', 'grunge', 'graphic', 'streetwear'], 'size': 'L', 'condition': 'fair', 'price': 26.0, 'colors': ['black', 'charcoal'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_012', 'title': 'Oversized Crewneck Sweatshirt — Vintage Navy', 'description': 'Perfectly faded navy crewneck. Genuinely vintage — not manufactured distressed. Ribbed cuffs and hem. No graphics, clean.', 'category': 'tops', 'style_tags': ['vintage', 'basics', 'oversized', 'classic'], 'size': 'XL (fits oversized)', 'condition': 'good', 'price': 20.0, 'colors': ['navy'], 'brand': None, 'platform': 'thredUp'}, {'id': 'lst_011', 'title': 'Low-Rise Cargo Pants — Khaki', 'description': 'Y2K era low-rise cargo pants. Lots of pockets. Khaki color, slightly distressed at the hems. Great for layering with a long tee.', 'category': 'bottoms', 'style_tags': ['y2k', 'cargo', '2000s', 'streetwear'], 'size': 'W29', 'condition': 'fair', 'price': 27.0, 'colors': ['khaki', 'tan'], 'brand': None, 'platform': 'poshmark'}]
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Outfit one: Pair the Vintage Levi's 501 Jeans with the white ribbed tank top, the oversized grey crewneck sweatshirt layered on top, and the chunky white sneakers. Add the black crossbody bag to complete this casual streetwear look. 
 
+Outfit two: Style the Vintage Levi's 501 Jeans with the black cropped zip hoodie and the black combat boots. Cinch the waist with the brown leather belt and layer the vintage black denim jacket on top for a rugged, all-black-and-indigo ensemble.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
-
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Nothing beats finding a classic pair of vintage Levi's 501 jeans in the absolute best medium wash. Just styled them with crisp white sneakers for that effortless off-duty model vibe. Snagged these for $38 and they're currently live on my depop.
 ```
 
 ---
 
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
-
-     "I used Claude to help me code" is not enough.
-
-     "I gave Claude my search_listings spec. It returned None on no match
-     instead of an empty list, so I changed it" is the level we want. -->
-
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* An implementation of `search_listings` from my Tool Inventory spec, including the size rule I had written: a size matches only when every word of the request is a whole word of the listing's size.
+- *What came back:* A tokenizing `_size_matches` (not a substring test), plus scoring that weights title hits double and breaks ties by lower price.
+- *What I changed:* I checked it against the real sizes in the data rather than trusting it: `M` returned only `S/M` items, and `L` returned only `L` and `M/L`, never `XL` or shoes. Searching "graphic tee" ranks "Vintage Band Tee" above "Graphic Tee" for "vintage graphic tee" because of the tie-break, which I left alone.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* The planning loop in `agent.py::run_agent` following my branch rule, with query parsing done by regex.
+- *What came back:* `parse_query` plus a step-based loop that stops after `search_listings` returns `[]`, with an error naming what to change.
+- *What I changed:* I ran the parser on five phrasings ("under $30", "max 60", "$40", "size US 9", a bare "L") and wrapped both model tools to confirm the same `id` reached each one as `selected_item` (criterion 3). I ran both example paths in `python agent.py` to confirm the ballgown query returns `fit_card = None`.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
