@@ -13,6 +13,8 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
@@ -45,6 +47,48 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "fit_card": None,            # what create_fit_card returned
         "error": None,               # set when the run ended early
     }
+
+
+# ── query parsing ─────────────────────────────────────────────────────────────
+
+_PRICE_PATTERNS = [
+    r"(?:under|below|less than|max(?:imum)?|up to|at most|<=?)\s*\$?\s*(\d+(?:\.\d+)?)",
+    r"\$\s*(\d+(?:\.\d+)?)",
+    r"(\d+(?:\.\d+)?)\s*(?:dollars|bucks|usd)",
+]
+_SIZE_PHRASE = r"\bsize\s+((?:us\s*)?[a-z0-9./]+)"
+_SIZE_BARE = r"(?<![\w$])(xxs|xs|xl|xxl|s|m|l)(?![\w$])"
+
+
+def parse_query(query: str) -> dict:
+    """
+    Pull description / size / max_price out of plain language with regex.
+    "vintage graphic tee under $30, size M" →
+        {"description": "vintage graphic tee", "size": "M", "max_price": 30.0}
+    """
+    text = query.strip()
+    max_price = None
+    for pattern in _PRICE_PATTERNS:
+        m = re.search(pattern, text, flags=re.I)
+        if m:
+            max_price = float(m.group(1))
+            text = text[: m.start()] + " " + text[m.end():]
+            break
+
+    size = None
+    m = re.search(_SIZE_PHRASE, text, flags=re.I)
+    if m:
+        size = re.sub(r"\s+", " ", m.group(1)).upper()
+        text = text[: m.start()] + " " + text[m.end():]
+    else:
+        m = re.search(_SIZE_BARE, text, flags=re.I)
+        if m:
+            size = m.group(1).upper()
+            text = text[: m.start()] + " " + text[m.end():]
+
+    description = re.sub(r"[^\w\s'-]", " ", text)
+    description = re.sub(r"\s+", " ", description).strip()
+    return {"description": description, "size": size, "max_price": max_price}
 
 
 # ── planning loop ─────────────────────────────────────────────────────────────
@@ -106,9 +150,49 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         than a stack trace. The import is already at the top of this file.
     """
     session = new_session(query, wardrobe)
+    session["parsed"] = parse_query(query)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    count = 0
+    step = "search"
+    while step != "done":
+        count += 1
+        trace.check_iterations(count)
+
+        if step == "search":
+            p = session["parsed"]
+            session["search_results"] = search_listings(
+                p["description"], size=p["size"], max_price=p["max_price"]
+            )
+            # THE BRANCH: nothing found → explain and stop. Never call the
+            # model tools with nothing to work on.
+            if not session["search_results"]:
+                hints = []
+                if p["size"]:
+                    hints.append(f"drop or change the size ({p['size']})")
+                if p["max_price"] is not None:
+                    hints.append(f"raise the price ceiling (${p['max_price']:.0f})")
+                hints.append("try broader keywords like 'tee', 'jeans' or 'jacket'")
+                session["error"] = (
+                    f"No listings matched '{p['description']}'. Try to "
+                    + ", ".join(hints[:-1]) + (", or " if len(hints) > 1 else "")
+                    + hints[-1] + "."
+                )
+                return session
+            session["selected_item"] = session["search_results"][0]
+            step = "outfit"
+
+        elif step == "outfit":
+            session["outfit_suggestion"] = suggest_outfit(
+                session["selected_item"], session["wardrobe"]
+            )
+            step = "card"
+
+        elif step == "card":
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"], session["selected_item"]
+            )
+            step = "done"
+
     return session
 
 
