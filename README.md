@@ -52,7 +52,7 @@ instead of making up an outfit for an item that doesn't exist.
 
 ### `search_listings`
 
-- **What it does:** Filters the 40 listings by price ceiling and size, scores the rest by keyword overlap with the description (title, description, tags, category, colors, brand), drops zero scores, and ranks best first. No model call.
+- **What it does:** Filters the 40 listings by price ceiling and size, scores the rest by keyword overlap with the description (title, description, tags, category, colors, brand), drops zero scores, and ranks best first. The last keyword is treated as the kind of item asked for ("boots" in "black boots"): a listing whose title, category, tags or colours lack it is dropped (added in unit 4, see The Improvement). No model call. Served over MCP by `mcp_server.py`.
 - **Inputs:** `description` (str) keywords; `size` (str or None) — matches when every word of the requested size appears as a whole word in the listing's size, so `M` matches `M`, `S/M` and `M/L` but not `XL` or `US 9`; `max_price` (float or None) — inclusive ceiling.
 - **Returns:** A list of up to `config.SEARCH_RESULT_LIMIT` (10) listing dicts (`id, title, description, category, style_tags, size, condition, price, colors, brand, platform`), highest keyword score first, ties broken by lower price.
 - **When it has nothing:** Returns `[]` — an empty list, never `None`, never an exception. The loop branches on this.
