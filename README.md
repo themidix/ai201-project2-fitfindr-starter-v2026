@@ -148,6 +148,12 @@ Nothing beats finding a classic pair of vintage Levi's 501 jeans in the absolute
 - *What came back:* `parse_query` plus a step-based loop that stops after `search_listings` returns `[]`, with an error naming what to change.
 - *What I changed:* I ran the parser on five phrasings ("under $30", "max 60", "$40", "size US 9", a bare "L") and wrapped both model tools to confirm the same `id` reached each one as `selected_item` (criterion 3). I ran both example paths in `python agent.py` to confirm the ballgown query returns `fit_card = None`.
 
+**Moment 3 (unit 4)**
+
+- *What I asked for:* Run the five criteria five times each, and tell me whether I passed.
+- *What came back:* A 5/5 on everything, which didn't match what I could see in the output: the selected item for `black boots under $60` was a pair of shorts.
+- *What I changed:* I didn't treat the table as the answer. I added a relevance diagnostic that doesn't depend on the search's own scoring, measured 3/5 on it, changed one thing in `search_listings`, and re-ran. It then exposed a parser leftover ("dollars"), which I reported rather than fixed.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -157,134 +163,244 @@ Nothing beats finding a classic pair of vintage Levi's 501 jeans in the absolute
 
 ## Run Log — Before
 
-<!-- Five criteria, five tries each, in this exact format.
-
-     Five, because your criteria are written out of five. Mark each try PASS
-     or FAIL, count the passes, and read that count against your target — a
-     row targeting 4 of 5 with three PASS cells is MISSED (3/5).
-
-     `python run_eval.py --label before` runs everything and writes the table
-     into results/. Paste it here and fill in the verdicts. -->
+Produced by `score_runs.py` (which wraps `run_eval.py::run_once`, cache off,
+temperature 0.9, five tries per criterion), against `agent.py::run_agent` after
+`search_listings` moved onto MCP. Full output: `results/run_2026-10-14_1821_before.md`.
+Each PASS/FAIL applies the sentence in `criteria.md` (`score_runs.py::passes`).
+For criterion 5 the five tries use five different ceilings and phrasings
+(`score_runs.py::CEILING_QUERIES`); for criterion 4 the "different item" card
+is the card from criterion 3's try with the same number.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. impossible query stops early | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. state: selected item reaches both tools | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card: length, price, platform | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. price ceiling respected | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+**Real output from one try, per criterion** (try 1, `results/run_2026-10-14_1821_before.md`):
+
+*Criterion 1 — produced by `agent.py::run_agent`, query `vintage graphic tee under $30`*
 
 ```
+selected_item: Vintage Band Tee — Faded Grey ($19.0, depop)
+Fit card: Found this perfectly faded grey vintage band tee and I'm obsessed with how soft it is. Grab it on my depop for just $19 before I change my mind and keep it for myself. Style it grungy with combat boots and denim, or dress it down with wide-leg trousers for that effortless streetwear look 🎸🖤
+```
 
+*Criterion 2 — `agent.py::run_agent`, query `designer ballgown size XXS under $5`*
+
+```
+stopped early: yes — No listings matched 'designer ballgown'. Try to drop or change the size (XXS), raise the price ceiling ($5), or try broader keywords like 'tee', 'jeans' or 'jacket'.
+selected_item: (none)    fit_card: None    suggest_outfit calls: 0
+```
+
+*Criterion 3 — `agent.py::run_agent`, query `black boots under $60`. Scorer saw the same `id` at `selected_item`, `search_results[0]`, the `suggest_outfit` argument and the `create_fit_card` argument.*
+
+```
+selected_item: Biker Shorts — Black, Shiny ($14.0, depop)
+```
+
+*Criterion 4 — `tools.py::create_fit_card`, query `vintage graphic tee under $30`*
+
+```
+obsessed with the perfectly worn-in fade on this vintage band tee, up on my depop for just $19. lean into total grunge with baggy denim and combat boots, or switch it up with wide-leg trousers and a black denim jacket for an easy streetwear moment. 🖤
+```
+
+*Criterion 5 — `tools.py::search_listings` via `mcp_server.py`, query `jeans under $30`*
+
+```
+selected_item: Straight Leg Black Jeans — Faded ($30.0, thredUp)   (every result <= $30)
 ```
 
 ---
 
 ## Verdicts and Diagnoses
 
-<!-- MET or MISSED per criterion against LAST UNIT's target, plus a sentence on
-     how you decided.
-
-     Then, for every miss: which of the four places it happened — a tool, the
-     loop's branch, the session, or the model's output — AND the mechanism.
-
-     Not a diagnosis:  "The fit card was bad."
-     A diagnosis:      "The fit card criterion missed on 2 of 5 items. Both had
-                        an empty brand field. My prompt puts the brand in the
-                        first sentence, so the card opened with a blank and read
-                        like a fragment. The tool worked; the prompt assumed a
-                        field that isn't always there."
-
-     Look for a pattern. Three misses on the same tool is one problem, not
-     three. -->
-
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4 of 5 | MET (5/5) | 5 PASS cells; target was 4. |
+| 2 | Impossible query stops before tool 2 | 5 of 5 | MET (5/5) | 5 of 5 stopped with an error naming what to change; the wrapped `suggest_outfit` was never called. |
+| 3 | Selected item is the item passed on | 5 of 5 | MET (5/5) | The four ids matched in all 5 tries. |
+| 4 | Fit card 2-4 sentences, price, platform, distinct opening | 4 of 5 | MET (5/5) | 5 PASS cells; counted by regex in `score_runs.py`. |
+| 5 | No result over the price ceiling | 5 of 5 | MET (5/5) | 5 different ceilings, 0 results over the ceiling in all 5. |
 
 **Diagnoses**
 
+Nothing missed, so there is no failing stage to name. What I can say honestly
+is that my targets were too easy, and I can point at the evidence.
 
+- **Criterion 3 passes while the agent is wrong.** For `black boots under $60`,
+  the criterion-3 scenario passed 5 of 5, and in all five tries the "selected
+  item" was **Biker Shorts — Black, Shiny**. State was perfect; the item was not
+  what was asked for. Stage: the tool (`tools.py::search_listings`). Mechanism:
+  every query word counts the same, so the colour "black" in a title scores
+  2 and the noun "boots" in the title of "Suede Chelsea Boots — Tan" also scores
+  2. They tie, and the tie is broken by lower price, so the $14 shorts beat the
+  $44 boots. Criterion 1 (target 4 of 5) can't see this either: it only asks
+  that three tools ran.
+- **Tighter target I would set:** "For 5 queries naming a garment, the top
+  result's title contains that garment (or the list is empty because nothing
+  with it fits the size and price) — 5 of 5." Criterion 1 as written is a
+  statement about the loop, not about whether the answer is any good. The
+  diagnostic below measures that sentence:
+
+```
+Before the change
+| Diagnostic | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Result |
+|---|---|---|---|---|---|---|---|
+| top result is the thing asked for | 5 of 5 | FAIL | FAIL | PASS | PASS | PASS | 3/5 |
+  FAIL  'black boots under $60'                  -> Biker Shorts — Black, Shiny
+  FAIL  'cropped black hoodie size M'            -> Mesh Long-Sleeve Top — Black
+  PASS  'denim jacket under $50'                 -> Denim Jacket — Light Wash, Cropped
+  PASS  'white sneakers'                         -> Low-Top Canvas Sneakers — Off-White
+  PASS  'vintage graphic tee under $30'          -> Vintage Band Tee — Faded Grey
+```
+
+- **Criterion 4 was also loose.** All five cards open differently, but they
+  share phrases ("obsessed with", "grab it before I change my mind and keep it"),
+  which my "different opening sentence" check passes. Tighter target: no more
+  than 2 of 5 cards for the same item contain the same 4-word phrase.
+
+I did not revise any criterion in `criteria.md`: none of them was unmeasurable,
+they were measurable and easy.
 
 ---
 
 ## Loop Trace
 
-<!-- One full run, printed step by step, with the MCP call visible in it.
-
-     `python app.py ask '...' --trace` once you've added the trace.step()
-     calls in Milestone 2.
-
-     Worth pasting BOTH the happy path and the empty-search path. The empty
-     one should be visibly shorter, because it stops. If your two traces are
-     the same length, your branch isn't working — and this is the fastest way
-     anyone will ever find that out. -->
-
-**Happy path**
+**Happy path** (`python app.py ask 'denim jacket under $50' --trace`; `agent.py::run_agent`)
 
 ```
-
+[1] parse_query
+      in:  denim jacket under $50
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 2 items: Denim Jacket — Light Wash, Cropped, 90s Track Jacket — Navy/White Stripe
+[3] select
+      out: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+      →    took the first (best-scored) result
+[4] suggest_outfit
+      in:  Denim Jacket — Light Wash, Cropped + 10 wardrobe items
+      out: Outfit 1: Pair the Wrangler denim jacket with the white ribbed tank top, baggy straight-leg jeans, and chunky …
+[5] create_fit_card
+      in:  Denim Jacket — Light Wash, Cropped
+      out: Obsessed with the 90s streetwear vibe of this cropped Wrangler light wash denim jacket, especially since it wa…
 ```
 
-**Empty search**
+**Empty search** (`python app.py ask 'designer ballgown size XXS under $5' --trace`) — three steps, then it stops:
 
 ```
-
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    search returned [] — stopping before suggest_outfit
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**The three failure modes, triggered on purpose**
 
+| Failure | How I triggered it | What the agent said |
+|---|---|---|
+| Empty search | `designer ballgown size XXS under $5` | `No listings matched 'designer ballgown'. Try to drop or change the size (XXS), raise the price ceiling ($5), or try broader keywords like 'tee', 'jeans' or 'jacket'.` |
+| Empty wardrobe | `python app.py ask 'oversized denim jacket under $60' --empty-wardrobe` | Not a crash and not an empty string: `suggest_outfit` returned general styling advice ("Pair the cropped Wrangler jacket with a fitted white ribbed tank top and high-waisted black straight-leg jeans…") and the card was written from it. |
+| Model unavailable | `GEMINI_API_KEY=AQ.badkeyXXXX AI201_CACHE=0 python app.py ask 'striped knit sweater'` (set in the shell only; `.env` untouched) | `The model couldn't be reached while running 'outfit'. The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com. Nothing was lost: fix the problem above and ask again.` The search step had already run. This was a crash-free handler I added: `agent.py::run_agent` catches `ModelUnavailable` (and `MCPError` for the search server). |
 
+**On the MCP move:** `search_listings` is registered in `mcp_server.py` with its
+description and typed inputs, and `run_agent` calls it with
+`mcp_client.call_tool("search_listings", {...})`. The other two tools are
+called directly. Nothing behaved differently: for three queries the MCP result
+was `==` to the direct call (7, 2 and 0 results). The costs are speed (each call
+starts a Python process) and that the trace says `(via MCP)`.
 
 ---
 
 ## The Improvement
 
-<!-- What you changed, why your diagnosis pointed at it, and the after-run in
-     the same table format. One change, measured properly.
+**What I changed:** In `tools.py::search_listings`, the last keyword of the
+description is treated as the kind of thing being asked for. A listing whose
+title, category, tags or colours don't contain it is dropped instead of ranked.
+That is one change in one function; the MCP server wraps it unchanged.
 
-     `python run_eval.py --label after` -->
-
-**What I changed:**
-
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** The diagnosis above: `black boots under
+$60` returned Biker Shorts because a matching colour tied with the matching
+noun and price broke the tie. Under the new rule the shorts are dropped
+because they are not "boots".
 
 ### Run Log — After
 
+`results/run_2026-10-14_1825_after.md`, same scorer, same format.
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. impossible query stops early | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. state: selected item reaches both tools | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card: length, price, platform | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. price ceiling respected | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Did it help, and how do I know:**
+Relevance diagnostic (the sentence I should have written as a criterion), before and after, same five queries:
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+```
+Before
+| Diagnostic | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Result |
+|---|---|---|---|---|---|---|---|
+| top result is the thing asked for | 5 of 5 | FAIL | FAIL | PASS | PASS | PASS | 3/5 |
+  FAIL  'black boots under $60'                  -> Biker Shorts — Black, Shiny
+  FAIL  'cropped black hoodie size M'            -> Mesh Long-Sleeve Top — Black
+  PASS  'denim jacket under $50'                 -> Denim Jacket — Light Wash, Cropped
+  PASS  'white sneakers'                         -> Low-Top Canvas Sneakers — Off-White
+  PASS  'vintage graphic tee under $30'          -> Vintage Band Tee — Faded Grey
 
+After
+| Diagnostic | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Result |
+|---|---|---|---|---|---|---|---|
+| top result is the thing asked for | 5 of 5 | PASS | PASS | PASS | PASS | PASS | 5/5 |
+  PASS  'black boots under $60'                  -> Suede Chelsea Boots — Tan
+  PASS  'cropped black hoodie size M'            -> []
+  PASS  'denim jacket under $50'                 -> Denim Jacket — Light Wash, Cropped
+  PASS  'white sneakers'                         -> Low-Top Canvas Sneakers — Off-White
+  PASS  'vintage graphic tee under $30'          -> Vintage Band Tee — Faded Grey
+```
 
+**Did it help, and how do I know:** The relevance diagnostic went from 3/5 to
+5/5: `black boots` now returns the Chelsea boots and `cropped black hoodie size M`
+returns an empty list, correctly, since the only hoodie is size L, so the
+agent stops and tells the user to change the size. The five criteria were 5/5
+before and after, so they could not show the difference; they were never going
+to. It also **cost something**: in the after run, try 5 of criterion 5 used
+`boots under 60 dollars`, and it returned *no results*. The parser removes
+"under 60" and leaves "dollars", which is now the last word and so the "kind of
+thing"; nothing is called "dollars". That try is a PASS only because an empty
+list is never over the ceiling. The "after" 5/5 for criterion 5 is therefore
+weaker than it looks, and I'm not counting it as a clean pass.
 
 ---
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+- **The `dollars` leftover (regression I caused).** `agent.py::parse_query`
+  strips "under 60" but not the word "dollars", and my new rule turns the last
+  leftover word into a hard requirement. Fix: strip a trailing currency word in
+  the parser. I did not make it because this unit allows one improvement, and
+  I wanted the measured change to be the change I reported.
+- **"Top" matches inside "Low-Top".** `tops $20` returns "Low-Top Canvas
+  Sneakers" as the second result because the stem `top` is in its title.
+  A category-aware match (use `category == "tops"`) would fix it.
+- **The head noun is just the last word.** `tee in black` makes "black" the
+  head, which matches the colour field, so the noun isn't enforced.
+- **Criterion 4 is satisfiable by a template.** See the diagnosis; I'd tighten
+  it to a repeated-phrase count. I stopped because it needs a prompt change,
+  which would be a second improvement.
+- **The search only matches words.** "something cute for brunch" still returns
+  nothing. I'd need embeddings or the model to rewrite the query, and that is
+  a different project.
 
-
+---
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
