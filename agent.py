@@ -17,7 +17,7 @@ import re
 
 import config
 import trace
-from mcp_client import call_tool
+from mcp_client import call_tool, MCPError
 from tools import suggest_outfit, create_fit_card
 from generate import ModelUnavailable
 
@@ -152,6 +152,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
     session["parsed"] = parse_query(query)
+    trace.step("parse_query", inputs=query, returned=session["parsed"])
 
     count = 0
     step = "search"
@@ -159,43 +160,74 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         count += 1
         trace.check_iterations(count)
 
-        if step == "search":
-            p = session["parsed"]
-            # search_listings is served over MCP (mcp_server.py), not called directly
-            session["search_results"] = call_tool("search_listings", {
-                "description": p["description"],
-                "size": p["size"],
-                "max_price": p["max_price"],
-            })
-            # THE BRANCH: nothing found → explain and stop. Never call the
-            # model tools with nothing to work on.
-            if not session["search_results"]:
-                hints = []
-                if p["size"]:
-                    hints.append(f"drop or change the size ({p['size']})")
-                if p["max_price"] is not None:
-                    hints.append(f"raise the price ceiling (${p['max_price']:.0f})")
-                hints.append("try broader keywords like 'tee', 'jeans' or 'jacket'")
-                session["error"] = (
-                    f"No listings matched '{p['description']}'. Try to "
-                    + ", ".join(hints[:-1]) + (", or " if len(hints) > 1 else "")
-                    + hints[-1] + "."
+        try:
+            if step == "search":
+                p = session["parsed"]
+                args = {
+                    "description": p["description"],
+                    "size": p["size"],
+                    "max_price": p["max_price"],
+                }
+                # search_listings is served over MCP (mcp_server.py), not called directly
+                session["search_results"] = call_tool("search_listings", args)
+                trace.step("search_listings (via MCP)", inputs=args,
+                           returned=session["search_results"])
+
+                # THE BRANCH: nothing found → explain and stop. Never call the
+                # model tools with nothing to work on.
+                if not session["search_results"]:
+                    hints = []
+                    if p["size"]:
+                        hints.append(f"drop or change the size ({p['size']})")
+                    if p["max_price"] is not None:
+                        hints.append(f"raise the price ceiling (${p['max_price']:.0f})")
+                    hints.append("try broader keywords like 'tee', 'jeans' or 'jacket'")
+                    session["error"] = (
+                        f"No listings matched '{p['description']}'. Try to "
+                        + ", ".join(hints[:-1]) + (", or " if len(hints) > 1 else "")
+                        + hints[-1] + "."
+                    )
+                    trace.step("branch", note="search returned [] — stopping before suggest_outfit")
+                    return session
+                session["selected_item"] = session["search_results"][0]
+                trace.step("select", returned=session["selected_item"],
+                           note="took the first (best-scored) result")
+                step = "outfit"
+
+            elif step == "outfit":
+                session["outfit_suggestion"] = suggest_outfit(
+                    session["selected_item"], session["wardrobe"]
                 )
-                return session
-            session["selected_item"] = session["search_results"][0]
-            step = "outfit"
+                trace.step("suggest_outfit",
+                           inputs=f"{session['selected_item']['title']} + "
+                                  f"{len(session['wardrobe'].get('items', []))} wardrobe items",
+                           returned=session["outfit_suggestion"])
+                step = "card"
 
-        elif step == "outfit":
-            session["outfit_suggestion"] = suggest_outfit(
-                session["selected_item"], session["wardrobe"]
-            )
-            step = "card"
+            elif step == "card":
+                session["fit_card"] = create_fit_card(
+                    session["outfit_suggestion"], session["selected_item"]
+                )
+                trace.step("create_fit_card",
+                           inputs=session["selected_item"]["title"],
+                           returned=session["fit_card"])
+                step = "done"
 
-        elif step == "card":
-            session["fit_card"] = create_fit_card(
-                session["outfit_suggestion"], session["selected_item"]
+        except ModelUnavailable as exc:
+            session["error"] = (
+                f"The model couldn't be reached while running '{step}'. {exc} "
+                "Nothing was lost: fix the problem above and ask again."
             )
-            step = "done"
+            trace.step("model unavailable", note=str(exc)[:100])
+            return session
+        except MCPError as exc:
+            session["error"] = (
+                "The listing search service didn't respond, so nothing was "
+                f"searched. Check that `python mcp_server.py` starts on its own, "
+                f"then ask again. Detail: {str(exc).splitlines()[0]}"
+            )
+            trace.step("mcp unavailable", note=session["error"][:100])
+            return session
 
     return session
 
