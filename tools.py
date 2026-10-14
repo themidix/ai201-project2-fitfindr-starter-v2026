@@ -115,11 +115,25 @@ def search_listings(
     if not query_words:
         return []
 
+    # The last keyword is the thing being asked for ("boots" in "black boots");
+    # the words before it describe it. An item that doesn't have that word in
+    # its title, category, tags or colours is a different kind of thing, so it
+    # is dropped rather than ranked.
+    head = [w for w in _words(description) if w not in _STOPWORDS][-1]
+
     scored = []
     for item in load_listings():
         if max_price is not None and item["price"] > max_price:
             continue
         if size and not _size_matches(size, item["size"]):
+            continue
+        kind_words = set(
+            _words(
+                " ".join([item["title"], item["category"],
+                          " ".join(item["style_tags"]), " ".join(item["colors"])])
+            )
+        )
+        if head not in kind_words:
             continue
 
         title_words = set(_words(item["title"]))
