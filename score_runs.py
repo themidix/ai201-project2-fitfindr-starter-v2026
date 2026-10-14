@@ -30,6 +30,54 @@ CEILING_QUERIES = [
 ]
 
 
+# Diagnostic (not one of the five): does the top result actually contain the
+# thing that was asked for? Ground truth does not depend on the search's own
+# scoring: look at every listing that passes the size and price filters; if any
+# has the noun in its title, the top result must too; if none does, the right
+# answer is an empty list.
+RELEVANCE_QUERIES = [
+    ("black boots under $60", "boot"),
+    ("cropped black hoodie size M", "hoodie"),
+    ("denim jacket under $50", "jacket"),
+    ("white sneakers", "sneaker"),
+    ("vintage graphic tee under $30", "tee"),
+]
+
+
+def relevance_marks():
+    import agent
+    import tools
+    from utils.data_loader import load_listings
+
+    marks = []
+    for query, noun in RELEVANCE_QUERIES:
+        p = agent.parse_query(query)
+        results = tools.search_listings(p["description"], p["size"], p["max_price"])
+        eligible = [
+            l for l in load_listings()
+            if (p["max_price"] is None or l["price"] <= p["max_price"])
+            and (not p["size"] or tools._size_matches(p["size"], l["size"]))
+            and noun in l["title"].lower()
+        ]
+        if eligible:
+            ok = bool(results) and noun in results[0]["title"].lower()
+        else:
+            ok = results == []
+        marks.append((query, ok, results[0]["title"] if results else "[]"))
+    return marks
+
+
+def print_relevance():
+    marks = relevance_marks()
+    n = sum(1 for _, ok, _ in marks if ok)
+    print("| Diagnostic | Target | " + " | ".join(f"Try {i}" for i in range(1, 6)) + " | Result |")
+    print("|---|---|---|---|---|---|---|---|")
+    print("| top result is the thing asked for | 5 of 5 | "
+          + " | ".join("PASS" if ok else "FAIL" for _, ok, _ in marks) + f" | {n}/5 |")
+    for q, ok, top in marks:
+        print(f"  {'PASS' if ok else 'FAIL'}  {q!r:40} -> {top}")
+
+
 def run_try(scenario, query):
     """One try, with the two model tools wrapped to record what reached them."""
     import agent
@@ -97,7 +145,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--label", default="")
     parser.add_argument("--tries", type=int, default=5)
+    parser.add_argument("--relevance-only", action="store_true",
+                        help="run only the search-relevance diagnostic (no model calls)")
     args = parser.parse_args()
+    if args.relevance_only:
+        print_relevance()
+        return
     config.CACHE_ENABLED = False
 
     rows = []
@@ -140,6 +193,8 @@ def main():
                      + " | ".join("PASS" if m else "FAIL" for m in marks)
                      + f" | {verdict} ({n}/{args.tries}) |")
     print("\n" + "\n".join(table))
+    print()
+    print_relevance()
 
 
 if __name__ == "__main__":
