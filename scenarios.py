@@ -35,18 +35,32 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
+    {
+        # State. Criterion 3 — the item search found is the item both model
+        # tools received. score_runs.py compares the ids.
+        "name": "state: selected item reaches both tools",
+        "query": "black boots under $60",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Fit card. Criterion 4 — 2-4 sentences, price and platform present,
+        # and an opening sentence unlike the card for a different item
+        # (scenario 3's item). Same query five times: five real cards.
+        "name": "fit card: length, price, platform",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # Price ceiling. Criterion 5 — every result at or under the ceiling.
+        # The query below is only a placeholder: score_runs.py swaps in five
+        # different ceilings and phrasings, one per try (see CEILING_QUERIES).
+        "name": "price ceiling respected",
+        "query": "jeans under $30",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
 ]
 
 WARDROBES = ("example", "empty")
